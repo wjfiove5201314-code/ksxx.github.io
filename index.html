@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>希旭/伊某转换器</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: "Microsoft YaHei", Arial, sans-serif;
+        }
+        body {
+            background-color: #f5f7fa;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+        }
+        h1 {
+            color: #2d3748;
+            font-size: 24px;
+            margin-bottom: 25px;
+            text-align: center;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 15px;
+        }
+        .input-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            color: #4a5568;
+            font-weight: 500;
+            margin-bottom: 8px;
+            font-size: 16px;
+        }
+        textarea {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 14px;
+            resize: vertical;
+            min-height: 120px;
+            outline: none;
+            transition: border 0.3s;
+        }
+        textarea:focus {
+            border-color: #4299e1;
+            box-shadow: 0 0 0 2px rgba(66, 153, 225, 0.2);
+        }
+        .btn-group {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        #convertBtn {
+            background-color: #4299e1;
+            color: white;
+        }
+        #convertBtn:hover {
+            background-color: #3182ce;
+        }
+        #copyBtn {
+            background-color: #38a169;
+            color: white;
+        }
+        #copyBtn:hover {
+            background-color: #2f855a;
+        }
+        #copyBtn:disabled {
+            background-color: #a0aec0;
+            cursor: not-allowed;
+        }
+        .result-group {
+            margin-top: 25px;
+        }
+        .tip {
+            text-align: center;
+            margin-top: 15px;
+            font-size: 14px;
+            color: #718096;
+        }
+        .success-tip {
+            color: #38a169;
+            font-weight: 500;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>希旭/伊某转换器</h1>
+        
+        <!-- 原始链接输入区 -->
+        <div class="input-group">
+            <label for="originalLink">输入原始 proxy.htm 链接</label>
+            <textarea id="originalLink" placeholder="示例：https://imgcache.qq.com/open/connect/widget/mobile/login/proxy.htm?#&t=1761771160#&openid=..."></textarea>
+        </div>
+        
+        <!-- 功能按钮区 -->
+        <div class="btn-group">
+            <button id="convertBtn">一键转换</button>
+            <button id="copyBtn" disabled>复制结果</button>
+        </div>
+        
+        <!-- 转换结果区 -->
+        <div class="result-group">
+            <label for="resultLink">转换后 auth:// 链接</label>
+            <textarea id="resultLink" readonly placeholder="转换结果将显示在这里..."></textarea>
+        </div>
+        
+        <!-- 提示信息 -->
+        <div class="tip">支持自动提取 access_token、openid 等核心参数，默认有效期 60 天（5184000 秒）@ksxx520/yimou7891</div>
+        <div class="tip success-tip" id="successTip">✅ 复制成功！链接已保存到剪贴板</div>
+    </div>
+
+    <script>
+        // 获取DOM元素
+        const originalLink = document.getElementById('originalLink');
+        const resultLink = document.getElementById('resultLink');
+        const convertBtn = document.getElementById('convertBtn');
+        const copyBtn = document.getElementById('copyBtn');
+        const successTip = document.getElementById('successTip');
+
+        // 转换核心逻辑
+        convertBtn.addEventListener('click', function() {
+            const inputUrl = originalLink.value.trim();
+            
+            // 验证输入是否为目标链接
+            if (!inputUrl.startsWith('https://imgcache.qq.com/open/connect/widget/mobile/login/proxy.htm')) {
+                alert('请输入正确的 proxy.htm 链接！');
+                return;
+            }
+
+            try {
+                // 解析链接参数（处理URL中的 # 和 & 混合格式）
+                const urlParams = new URLSearchParams(inputUrl.split('?')[1] || '');
+                // 提取核心参数（若URLSearchParams无法获取，手动分割补充）
+                const params = {};
+                // 1. 从URLSearchParams提取
+                ['openid', 'access_token', 'pay_token', 'auth_time', 'page_type', 'key'].forEach(key => {
+                    if (urlParams.get(key)) params[key] = urlParams.get(key);
+                });
+                // 2. 手动分割补充（应对特殊格式的参数）
+                if (!params.openid) {
+                    const paramStr = inputUrl.split('?')[1] || '';
+                    paramStr.split(/[&#]/).forEach(item => {
+                        if (item) {
+                            const [key, value] = item.split('=');
+                            if (key && value) params[key] = value;
+                        }
+                    });
+                }
+
+                // 检查核心参数是否完整
+                const requiredParams = ['openid', 'access_token', 'pay_token', 'auth_time'];
+                const missingParams = requiredParams.filter(key => !params[key]);
+                if (missingParams.length > 0) {
+                    alert(`原始链接缺少必要参数：${missingParams.join(', ')}`);
+                    return;
+                }
+
+                // 组装 auth:// 格式链接（与目标格式完全对齐）
+                const authLink = `auth://tauth.qq.com/?#access_token=${params.access_token}&expires_in=5184000&openid=${params.openid}&pay_token=${params.pay_token}&ret=0&pf=desktop_m_qq-10000144-android-2002-&pfkey=${params.key || ''}&auth_time=${params.auth_time}&page_type=${params.page_type || 0}`;
+                
+                // 显示结果并启用复制按钮
+                resultLink.value = authLink;
+                copyBtn.disabled = false;
+                successTip.style.display = 'none'; // 隐藏之前的复制提示
+            } catch (error) {
+                alert('链接解析失败，请检查输入格式！');
+                console.error(error);
+            }
+        });
+
+        // 复制结果逻辑
+        copyBtn.addEventListener('click', function() {
+            resultLink.select();
+            document.execCommand('copy');
+            // 显示复制成功提示
+            successTip.style.display = 'block';
+            // 3秒后隐藏提示
+            setTimeout(() => {
+                successTip.style.display = 'none';
+            }, 3000);
+        });
+    </script>
+</body>
+</html>
